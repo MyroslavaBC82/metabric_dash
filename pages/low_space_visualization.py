@@ -10,15 +10,24 @@ import pandas as pd
 import plotly.express as px
 from sklearn.manifold import Isomap, LocallyLinearEmbedding
 import plotly.graph_objs as go
+import os
+from uuid import uuid4
+import diskcache
+from diskcache import Cache
 
+# Set up diskcache for caching
+cache = diskcache.Cache("./cache")
 
-
+# Caching duration (e.g., 60 seconds = 1 minute)
+CACHE_DURATION = 180
 
 dash.register_page(__name__)
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 # Load the dataset
-data = pd.read_csv("METABRIC_RNA_Mutation.csv")
+data = pd.read_csv("METABRIC_RNA_Mutation4.csv")
+# file_path = '/home/MyroslavaBC82/metabric_dash/METABRIC_RNA_Mutation4.csv'
+# data = pd.read_csv(file_path)
 available_variables = list(data.columns)
 EPSILON = 1e-9 
 numerical_data = data.select_dtypes(include='number')
@@ -70,21 +79,30 @@ def linear_layout_algorithm(data, iterations=1000, learning_rate=0.1, Vmax=5, Sm
 
 
 
-
 layout = html.Div(
     children=[
+            html.Div(
+                dcc.Loading(
+                    type="circle",
+                    children=[html.Div("Loading...", style={"font-size": "20px"})],
+                    fullscreen=True,
+                ),
+                id="loading-spinner",
+            ),
         html.Div(
             className="row",
             children=[
                 html.Div(
-                    className="six columns",
+                    className="six columns", style={'background-color': 'white', 'padding': '10px', 'box-shadow': '2px 2px 10px rgba(0, 0, 0, 0.2)'},
                     children=[
                         html.Div(
                             children=[
-                                dcc.Graph(
-                                    id="cluster-graph",
-                                    hoverData={"points": [{"hovertemplate": ""}]},
-                                ),
+                                  # Add loading to the graph
+                                    dcc.Graph(
+                                        id="cluster-graph",
+                                        hoverData={"points": [{"hovertemplate": ""}]},
+                                    ),
+                                    
                             ]
                         ),
                     ],
@@ -93,7 +111,6 @@ layout = html.Div(
                     className="six columns",
                     children=[
                         html.Div(
-                            className="six columns",
                             children=[
                                 html.Label("Method:"),
                                 dcc.Dropdown(
@@ -115,10 +132,9 @@ layout = html.Div(
                                         "display": "inline-block",
                                     },
                                 ),
-                            ],
+                            ]
                         ),
                         html.Div(
-                            className="six columns",
                             children=[
                                 html.Label("Number of Components:"),
                                 dcc.Input(
@@ -131,12 +147,32 @@ layout = html.Div(
                                     style={
                                         "width": "100px",
                                         "display": "inline-block",
+                                        "opacity": 1,  # Full opacity by default
                                     },
                                 ),
                             ],
+                            id="n-components-container",
                         ),
                         html.Div(
-                            className="six columns",
+                            children=[
+                                html.Label("Number of Neighbours:"),
+                                dcc.Input(
+                                    id="n-neighbours-input",
+                                    type="number",
+                                    min=2,
+                                    max=len(available_variables),
+                                    value=5,
+                                    step=1,
+                                    style={
+                                        "width": "100px",
+                                        "display": "inline-block",
+                                        "opacity": 1,  # Full opacity by default
+                                    },
+                                ),
+                            ],
+                            id="n-neighbours-container",
+                        ),
+                        html.Div(
                             children=[
                                 html.Label("Select Color Variable:"),
                                 dcc.Dropdown(
@@ -154,82 +190,105 @@ layout = html.Div(
                                         "display": "inline-block",
                                     },
                                 ),
-                            ],
+                            ]
                         ),
                         html.Div(
                             className="row",
                             children=[
-                                html.Label("Select Variables:"),
                                 html.Div(
-                                    className="scrollable",
-                                    style={
-                                        "height": "240px",
-                                        "overflowY": "scroll",
-                                    },
+                                    className="six columns",
                                     children=[
-                                        dcc.Checklist(
-                                            id="variable-checkboxes",
-                                            options=[
-                                                {
-                                                    "label": variable,
-                                                    "value": variable,
-                                                }
-                                                for variable in numerical_data
-                                            ],
-                                            value=[
-                                                "brca1",
-                                                "brca2",
-                                                "palb2",
-                                                "pten",
-                                                "tp53",
-                                                "atm",
-                                                "cdh1",
-                                                "chek2",
-                                                "nbn",
-                                                "nf1",
-                                                "stk11",
-                                                "bard1",
-                                                "mlh1",
-                                                "msh2",
-                                                "msh6",
-                                                "pms2",
-                                                "epcam",
-                                                "rad51c",
-                                                "rad51d",
-                                                "rad50",
-                                                "rb1",
-                                                "rbl1",
-                                                "rbl2",
-                                            ],
-                                            labelStyle={
-                                                "display": "block",
-                                                "margin": "5px",
+                                        html.Label(
+                                            "Select Variables for Clustering Graph:"
+                                        ),
+                                        html.Div(
+                                            className="scrollable",
+                                            style={
+                                                "height": "230px",
+                                                "overflowY": "scroll",
+                                                "border": "1px solid #ccc",
+                                                "border-radius": "5px",
+                                                "padding": "5px",
                                             },
+                                            children=[
+                                                dcc.Checklist(
+                                                    id="variable-checkboxes",
+                                                    options=[
+                                                        {
+                                                            "label": variable,
+                                                            "value": variable,
+                                                        }
+                                                        for variable in numerical_data
+                                                    ],
+                                                    value=[
+                                                        "brca1",
+                                                        "brca2",
+                                                        "palb2",
+                                                        "pten",
+                                                        "tp53",
+                                                        "atm",
+                                                        "cdh1",
+                                                        "chek2",
+                                                        "nbn",
+                                                        "nf1",
+                                                        "stk11",
+                                                        "bard1",
+                                                        "mlh1",
+                                                        "msh2",
+                                                        "msh6",
+                                                        "pms2",
+                                                        "epcam",
+                                                        "rad51c",
+                                                        "rad51d",
+                                                        "rad50",
+                                                        "rb1",
+                                                        "rbl1",
+                                                        "rbl2",
+                                                    ],
+                                                ),
+                                            ],
                                         ),
                                     ],
                                 ),
-                            ],
-                        ),
-                    ],  
-                ),  
-
-                # Add another Div for the checkboxes to show variables on Parallel Coordinates
-                html.Div(
-                    className="six columns",
-                    children=[
-                        html.Label("Select Variables to Show on Parallel Coordinates:"),
-                        html.Div(
-                            className="scrollable",  # Add the scrollable class here
-                            style={"height": "240px", "overflowY": "scroll"},  # Adjust the height and overflowY
-                            children=[
-                                dcc.Checklist(
-                                    id="show-variables-checkboxes",
-                                    options=[
-                                        {"label": variable, "value": variable}
-                                        for variable in numerical_data
+                                html.Div(
+                                    className="six columns",
+                                    children=[
+                                        html.Label(
+                                            "Select Variables for Parallel Coordinates:"
+                                        ),
+                                        html.Div(
+                                            className="scrollable",
+                                            style={
+                                                "height": "230px",
+                                                "overflowY": "scroll",
+                                                "border": "1px solid #ccc",
+                                                "border-radius": "5px",
+                                                "padding": "5px",
+                                            },
+                                            children=[
+                                                dcc.Checklist(
+                                                    id="show-variables-checkboxes",
+                                                    options=[
+                                                        {
+                                                            "label": variable,
+                                                            "value": variable,
+                                                        }
+                                                        for variable in numerical_data
+                                                    ],
+                                                    value=[
+                                                        "brca1",
+                                                        "brca2",
+                                                        "palb2",
+                                                        "pten",
+                                                        "tp53",
+                                                        "atm",
+                                                        "cdh1",
+                                                        "chek2",
+                                                    ],
+                                                ),
+                                            ],
+                                        ),
                                     ],
-                                    value=["brca1", "brca2", "palb2", 'pten', 'tp53', 'atm', 'cdh1', 'chek2'],  # Set default values here
-                                    labelStyle={"display": "block", "margin": "5px"},
                                 ),
                             ],
                         ),
@@ -237,8 +296,8 @@ layout = html.Div(
                 ),
             ],
         ),
-          html.Div(
-            className="row",
+        html.Div(
+            className="row", style={'margin-top': '20px', 'background-color': 'white', 'padding': '10px', 'box-shadow': '2px 2px 10px rgba(0, 0, 0, 0.2)'},
             children=[
                 html.Div(
                     className="twelve columns",
@@ -246,18 +305,17 @@ layout = html.Div(
                         html.Div(
                             children=[
                                 html.Label("Parallel Coordinates graph:"),
-                                dcc.Graph(
-                                    id="parallel-coordinates-graph",
-                                ),
+                                
+                                    dcc.Graph(id="parallel-coordinates-graph"),
+                                    
                             ]
                         ),
                     ],
                 ),
             ],
         ),
-
         html.Div(
-            className="row",
+            className="row", style={'margin-top': '20px','background-color': 'white', 'padding': '10px', 'box-shadow': '2px 2px 10px rgba(0, 0, 0, 0.2)'},
             children=[
                 html.Div(
                     style={"width": "100%"},
@@ -278,7 +336,7 @@ layout = html.Div(
                                 "backgroundColor": "rgb(230, 230, 230)",
                                 "fontWeight": "bold",
                             },
-                            row_selectable='multi',
+                            row_selectable="multi",
                             selected_rows=[],
                         ),
                     ],
@@ -293,6 +351,29 @@ layout = html.Div(
         "background-color": "#F5F5F5",
     },
 )
+
+@callback(Output("loading-spinner", "style"), Input("data-table", "data"))
+def hide_loading_spinner(data):
+    if data is not None:
+        return {"display": "none"}
+    else:
+        return {"display": "block"}
+
+# Callback to adjust the opacity/transparency based on the selected method
+@callback(
+    [
+        dash.dependencies.Output("n-components-container", "style"),
+        dash.dependencies.Output("n-neighbours-container", "style"),
+    ],
+    [dash.dependencies.Input("method-dropdown", "value")]
+)
+def adjust_opacity_based_on_method(method):
+    if method in ["umap", "isomap", "lle"]:
+        return {"opacity": 1}, {"opacity": 1}
+    elif method == "tsne":
+        return {"opacity": 1}, {"opacity": 0.5}
+    else:  # For PCA and Linear Layout Algorithm
+        return {"opacity": 0.5}, {"opacity": 0.5}
 
 
 @callback(
@@ -343,6 +424,7 @@ def update_parallel_coordinates(selected_show_variables, selected_rows):
         Input("variable-checkboxes", "value"),
         Input("method-dropdown", "value"),
         Input("n-components-input", "value"),
+        Input("n-neighbours-input", "value"),
         Input("color-variable-input", "value"),
         Input("data-table", "derived_virtual_data"),
         Input("data-table", "selected_rows"),
@@ -355,6 +437,7 @@ def update_cluster_graph(
     selected_variables,
     method,
     n_components,
+    n_neighbours,
     color_variable,
     derived_virtual_data,
     selected_rows_data_table,
@@ -362,6 +445,25 @@ def update_cluster_graph(
     current_figure,
     current_selected_rows,
 ):
+    
+    # Generate a unique key for this callback's cache entry
+    cache_key = (
+        selected_variables,
+        method,
+        n_components,
+        n_neighbours,
+        color_variable,
+        derived_virtual_data,
+        selected_rows_data_table,
+        click_data,
+        current_figure,
+        current_selected_rows,
+    )
+
+    # Check if the result is already cached and return it if available
+    if cache_key in cache:
+        cached_result = cache[cache_key]
+        return cached_result
     # Perform dimensionality reduction based on the selected method
     if derived_virtual_data is not None:
         data_subset = pd.DataFrame(derived_virtual_data)
@@ -371,24 +473,22 @@ def update_cluster_graph(
 
     if method == "umap":
         reducer = umap.UMAP(
-            n_neighbors=5, min_dist=0.3, n_components=n_components, random_state=42
+            n_neighbors=n_neighbours, min_dist=0.3, n_components=n_components, random_state=42
         )
     elif method == "tsne":
-        reducer = TSNE(
-            n_components=n_components, random_state=42
-        )
+        reducer = TSNE(n_components=n_components, random_state=42)
     elif method == "pca":
-        reducer = PCA(
+        reducer =  PCA(
             n_components=min(n_components, len(selected_variables)),
             svd_solver="randomized",
             random_state=42,
         )
     elif method == "isomap":
-        reducer = Isomap(n_neighbors=5, n_components=n_components)
+        reducer =  Isomap(n_neighbors=n_neighbours, n_components=n_components)
     elif method == "lle":
-        reducer = LocallyLinearEmbedding(n_neighbors=5, n_components=n_components)
+        reducer =  LocallyLinearEmbedding(n_neighbors=n_neighbours, n_components=n_components)
     elif method == "linear_layout_algorithm":
-        reducer = None  # Placeholder for the linear layout algorithm
+        reducer =  None 
 
     if reducer:
         embedding = reducer.fit_transform(selected_data)
@@ -469,4 +569,5 @@ def update_cluster_graph(
         fig["data"][0]["selectedpoints"] = selected_indices
         fig["data"][0]["selected"] = dict(marker=dict(color="red", size=10))
 
+    cache[cache_key] = (fig, current_selected_rows)
     return fig, current_selected_rows
