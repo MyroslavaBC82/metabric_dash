@@ -73,7 +73,7 @@ app.layout = html.Div([
                     "color": "black",
                     "text-decoration": "none",
                     "font-weight": "bold",
-                    "width": "335px",
+                    "width": "23.1%",
                     "cursor": "pointer",
                     "color": "black",
                     "background-color": "lightgray",
