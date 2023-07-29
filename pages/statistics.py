@@ -6,7 +6,9 @@ from plotly.subplots import make_subplots
 import plotly.express as px
 
 dash.register_page(__name__, path='/', suppress_callback_exceptions=True)
-data = pd.read_csv("METABRIC_RNA_Mutation.csv")
+data = pd.read_csv("METABRIC_RNA_Mutation3.csv")
+# file_path = '/home/MyroslavaBC82/metabric_dash/METABRIC_RNA_Mutation3.csv'
+# data = pd.read_csv(file_path)
 available_variables = list(data.columns)
 # Extract the numerical variables for correlation
 numerical_data = data.select_dtypes(include='number')
@@ -135,8 +137,11 @@ html.Div(style={'padding': '10px', 'border': '1px solid #ccc', 'border-radius': 
             ),
             html.Div(style={'margin-top': '20px'}),
 
-            html.Button("Clear Clicked Points", id="clear-button", n_clicks=0),
-            html.Button("Show All Data", id="show-all-data-button", n_clicks=0),
+            html.Div(style={'display': 'inline'}, children=[  # Add this inline style to the button container
+                html.Button("Clear Clicked Points", id="clear-button", n_clicks=0),
+                html.Div(style={'margin': '20px'}),
+                html.Button("Show All Data", id="show-all-data-button", n_clicks=0),
+            ]),
 
             # Scatter plot container
             dcc.Graph(id='scatter-plot', selectedData=None),
@@ -263,7 +268,7 @@ def update_statistics_table(selected_variable):
             num_zeros = (data[column] == 0).sum()
             min_value = data[column].min()
             max_value = data[column].max()
-            median = data[column].median()
+            median = round(data[column].median(), 2)
             mean = round(data[column].mean(), 2)
             std_value = round(data[column].std(), 2)
             num_outliers_2sigma = data[(data[column] - mean).abs() > 2 * std_value].shape[0]
