@@ -2,11 +2,12 @@ import dash
 from dash import html, dcc, callback, Input, Output, State
 import pandas as pd
 import plotly.graph_objs as go
-import dash_html_components as html
 
 
 dash.register_page(__name__, suppress_callback_exceptions=True)
-data = pd.read_csv("METABRIC_RNA_Mutation2.csv")
+data = pd.read_csv("METABRIC_RNA_Mutation3.csv")
+# file_path = '/home/MyroslavaBC82/metabric_dash/METABRIC_RNA_Mutation3.csv'
+# data = pd.read_csv(file_path)
 available_variables = list(data.columns)
 
 
