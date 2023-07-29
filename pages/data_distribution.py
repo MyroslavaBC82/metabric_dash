@@ -4,9 +4,12 @@ import pandas as pd
 import plotly.express as px
 from sklearn.preprocessing import StandardScaler
 import plotly.graph_objs as go
+import numpy as np
 
 dash.register_page(__name__)
-data = pd.read_csv("METABRIC_RNA_Mutation2.csv")
+# file_path = '/home/MyroslavaBC82/metabric_dash/METABRIC_RNA_Mutation3.csv'
+# data = pd.read_csv(file_path)
+data = pd.read_csv("METABRIC_RNA_Mutation3.csv")
 available_variables = list(data.columns)
 
 # Boxplot for numerical variables from columns 2 to 31
@@ -52,8 +55,8 @@ def update_distplot(selected_variable, selected_data_source, box_clickData, gene
     else:
         clicked_variable = None
 
-    if dropdown_value:
-        selected_variable = dropdown_value
+    if selected_variable:
+        dropdown_value = selected_variable
     # Use the clicked variable if available, otherwise use the selected_variable
     variable_to_plot = clicked_variable or dropdown_value or selected_variable
 
@@ -119,8 +122,8 @@ def update_boxplot(selected_variable, selected_data_source, box_clickData, gene_
         clicked_variable = gene_clickData['points'][0]['x']
     else:
         clicked_variable = None
-    if dropdown_value:
-        selected_variable = dropdown_value
+    if selected_variable:
+        dropdown_value = selected_variable
     # Use the clicked variable if available, otherwise use the selected_variable
     variable_to_plot = clicked_variable or dropdown_value or selected_variable
 
@@ -144,14 +147,24 @@ def update_boxplot(selected_variable, selected_data_source, box_clickData, gene_
 
 
 
-gene_mutation_count = data.iloc[:, 520:].apply(lambda x: x.astype(str).str.strip().apply(lambda val: val != '0' and val != '0')).sum()
-gene_mutation_count.index = gene_mutation_count.index.str.replace('_mut', '')
 
-gene_mutation_fig = px.bar(x=gene_mutation_count.index,
-                           y=gene_mutation_count.values,
-                           title='Gene Mutation Distribution',
-                           labels={'x': 'Gene Name', 'y': 'Mutation Count'},
-                           )
+# Assuming 'data' is your DataFrame
+start_column_index = 520
+
+# Select the subset of columns from 'start_column_index' to the end
+selected_columns = data.iloc[:, start_column_index:]
+
+# Count non-zero occurrences for each gene in the mutation data
+gene_mutation_count = pd.Series([np.sum(selected_columns[col].astype(str).str.strip() != '0') for col in selected_columns], index=selected_columns.columns)
+
+gene = gene_mutation_count.index.str.replace('_mut', '')
+val = gene_mutation_count.values
+gene_mutation_count_df = pd.DataFrame({'Gene Name': list(gene), 'Mutation Count': list(val)})
+gene_mutation_fig = px.bar(gene_mutation_count_df, x='Gene Name', y='Mutation Count',
+             title='Gene Mutation Distribution',
+             labels={'Gene Name': 'Gene Name', 'Mutation Count': 'Mutation Count'}
+            )
+
 
 # Set the default variable for the boxplot-survival and data source
 default_variable = numerical_variables_standardized.columns[0]
